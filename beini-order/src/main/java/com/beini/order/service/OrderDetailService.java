@@ -13,4 +13,7 @@ public interface OrderDetailService {
 	OrderDetail save(OrderDetail bean);
 	OrderDetail update(OrderDetail bean);
 	void delete(String... id);
+	
+	/*根据订单ID查询订单详情信息*/
+	Page<OrderDetail> findAll(String orderId, Pageable pageable);
 }

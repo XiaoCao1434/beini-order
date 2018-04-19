@@ -37,6 +37,7 @@ public class OrderController {
 		Order order = orderService.findById(id);
 		return ResultVOUtil.success(order);
 	}
+	
 	/**
 	 * 根据分页信息获取订单分页信息
 	 * @param pageNo 第几页
@@ -55,10 +56,10 @@ public class OrderController {
 	@PutMapping
 	public ResultVO update(Order order) {
 		if (order == null || order.getOrderUuid() == null || "".equals(order.getOrderUuid())) {
-			return ResultVOUtil.error(ResultEnum.ORDER_NOT_EXIST);
+			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_NOT_EXIST);
 		}
 		if (orderService.update(order) == null) {
-			return ResultVOUtil.error(ResultEnum.ORDER_UPDATE_FAIL);
+			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_UPDATE_FAIL);
 		} else {
 			return ResultVOUtil.success();
 		}
@@ -67,7 +68,7 @@ public class OrderController {
 	@PostMapping
 	public ResultVO save(Order order) {
 		if (orderService.save(order) == null) {
-			return ResultVOUtil.error(ResultEnum.ORDER_INSERT_FAIL);
+			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
 		} else {
 			return ResultVOUtil.success();
 		}
@@ -79,7 +80,7 @@ public class OrderController {
 			orderService.delete(id);
 			return ResultVOUtil.success();
 		} catch (Exception e) {
-			return ResultVOUtil.error(ResultEnum.ORDER_DELETE_FAIL);
+			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_DELETE_FAIL);
 		}
 	}
 }

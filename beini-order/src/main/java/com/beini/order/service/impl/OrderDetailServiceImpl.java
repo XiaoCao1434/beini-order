@@ -18,7 +18,10 @@ public class OrderDetailServiceImpl implements OrderDetailService {
 	public Page<OrderDetail> findAll(Pageable pageable) {
 		return repository.findAll(pageable);
 	}
-
+	@Override
+	public Page<OrderDetail> findAll(String orderId, Pageable pageable) {
+		return repository.findAllByOrderUuid(orderId,pageable);
+	}
 	@Override
 	public OrderDetail findById(String id) {
 		return repository.findOne(id);
@@ -44,4 +47,6 @@ public class OrderDetailServiceImpl implements OrderDetailService {
 			e.printStackTrace();
 		}
 	}
+
+	
 }
