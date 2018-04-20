@@ -67,6 +67,11 @@ public class OrderController {
 	@ApiOperation(value="增加订单信息")
 	@PostMapping
 	public ResultVO save(Order order) {
+		
+		/*查询商品--数量、价格*/
+		/*计算总价*/
+		/*写入订单数据库--订单总表和订单详情表*/
+		/*扣库存*/
 		if (orderService.save(order) == null) {
 			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
 		} else {
