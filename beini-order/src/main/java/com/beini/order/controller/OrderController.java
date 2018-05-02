@@ -18,7 +18,6 @@ import com.beini.core.vo.ResultVO;
 import com.beini.order.entity.Order;
 import com.beini.order.feignClient.product.ProductFeignClient;
 import com.beini.order.service.OrderService;
-import com.beini.product.entity.Product;
 
 import io.swagger.annotations.ApiOperation;
 
