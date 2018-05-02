@@ -15,8 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.beini.core.enums.ResultEnum;
 import com.beini.core.utils.ResultVOUtil;
 import com.beini.core.vo.ResultVO;
-import com.beini.order.service.OrderService;
 import com.beini.order.entity.Order;
+import com.beini.order.feignClient.product.ProductFeignClient;
+import com.beini.order.service.OrderService;
+import com.beini.product.entity.Product;
+
 import io.swagger.annotations.ApiOperation;
 
 @RestController
@@ -25,7 +28,8 @@ import io.swagger.annotations.ApiOperation;
 public class OrderController {
 	@Autowired
 	private OrderService orderService;
-	
+	@Autowired
+	private ProductFeignClient productFeignClient;
 	/**
 	 * 根据订单ID获取订单信息
 	 * @param id 订单ID
@@ -35,6 +39,13 @@ public class OrderController {
 	@GetMapping("{id}")
 	public ResultVO findById(@PathVariable(value = "id") String id) {
 		Order order = orderService.findById(id);
+		System.out.println("我是订单模块的findById： findById("+id+");");
+		ResultVO rv = productFeignClient.findById("11");
+		//System.out.println(product+"---------------订单模块的商品信息");
+		System.out.println("我是商品模块的findById： findById(11);  "+rv);
+		//Map<String ,Object> model = new HashMap<String,Object>();
+		//model.put("order", order);
+		//model.put("product", product);
 		return ResultVOUtil.success(order);
 	}
 	
