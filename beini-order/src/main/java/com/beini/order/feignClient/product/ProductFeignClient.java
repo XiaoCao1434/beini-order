@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.beini.core.vo.ResultVO;
+import com.beini.order.feignClient.product.impl.ProductFeignClientFallback;
 import com.beini.product.entity.Product;
 
 /**
@@ -14,7 +15,7 @@ import com.beini.product.entity.Product;
  * @author lb_chen
  * @date 2018-04-19 13:10
  */
-@FeignClient(name = "product")
+@FeignClient(name = "product",fallback=ProductFeignClientFallback.class)
 public interface ProductFeignClient {
 	/**
 	 * 根据商品ID获取商品信息
