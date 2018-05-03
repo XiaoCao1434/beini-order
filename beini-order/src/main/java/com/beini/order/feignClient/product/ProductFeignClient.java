@@ -32,9 +32,9 @@ public interface ProductFeignClient {
 	 * 根据分页信息获取商品分页信息
 	 * 
 	 * @param pageNo
-	 *            第几页
+	 *            第几页(可选参数)
 	 * @param pageSize
-	 *            每页条数
+	 *            每页条数(可选参数)
 	 * @return 商品分页信息
 	 */
 	@GetMapping("/product/product/")
@@ -42,7 +42,8 @@ public interface ProductFeignClient {
 			@RequestParam(name = "pageSize", required = false, defaultValue = "10") Integer pageSize);
 	/**
 	 * 修改商品库存
-	 * @param product 商品信息
+	 * @param proUuid 产品ID
+	 * @param number 购买产品数量
 	 * @return
 	 */
 	@PutMapping("/product/product/updateStock")
