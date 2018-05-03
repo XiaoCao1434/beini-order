@@ -1,5 +1,12 @@
 package com.beini.order.controller;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,8 +23,15 @@ import com.beini.core.enums.ResultEnum;
 import com.beini.core.utils.ResultVOUtil;
 import com.beini.core.vo.ResultVO;
 import com.beini.order.entity.Order;
+import com.beini.order.entity.OrderDetail;
 import com.beini.order.feignClient.product.ProductFeignClient;
+import com.beini.order.service.OrderDetailService;
 import com.beini.order.service.OrderService;
+import com.beini.order.vo.PlaceOrderDetailVo;
+import com.beini.order.vo.PlaceOrderVo;
+import com.beini.product.entity.Product;
+import com.google.gson.Gson;
+import com.taobao.txc.client.aop.annotation.TxcTransaction;
 
 import io.swagger.annotations.ApiOperation;
 
@@ -27,6 +41,8 @@ import io.swagger.annotations.ApiOperation;
 public class OrderController {
 	@Autowired
 	private OrderService orderService;
+	@Autowired
+	private OrderDetailService orderDetailService;
 	@Autowired
 	private ProductFeignClient productFeignClient;
 	/**
@@ -39,15 +55,15 @@ public class OrderController {
 	public ResultVO findById(@PathVariable(value = "id") String id) {
 		Order order = orderService.findById(id);
 		System.out.println("我是订单模块的findById： findById("+id+");");
-		ResultVO rv = productFeignClient.findById("11");
+		ResultVO product = productFeignClient.findById(id);
 		//System.out.println(product+"---------------订单模块的商品信息");
-		System.out.println("我是商品模块的findById： findById(11);  "+rv);
-		//Map<String ,Object> model = new HashMap<String,Object>();
-		//model.put("order", order);
-		//model.put("product", product);
-		return ResultVOUtil.success(order);
+		System.out.println("我是商品模块的findById： findById(11);  "+product);
+		Map<String ,Object> model = new HashMap<String,Object>();
+		model.put("order", order);
+		model.put("product", product);
+		
+		return ResultVOUtil.success(model);
 	}
-	
 	/**
 	 * 根据分页信息获取订单分页信息
 	 * @param pageNo 第几页
@@ -75,18 +91,94 @@ public class OrderController {
 		}
 	}
 	@ApiOperation(value="增加订单信息")
+	/*TXC事务*/
+	@TxcTransaction
 	@PostMapping
-	public ResultVO save(Order order) {
+	public ResultVO save(PlaceOrderVo placeOrderVo) throws Exception {
+		String openId = placeOrderVo.getOpenId();
+		/*此处应该根据客户ID查询客户详情*/
 		
-		/*查询商品--数量、价格*/
-		/*计算总价*/
+		/*店铺ID*/
+		String storeId = placeOrderVo.getStoreId();
+		String addressNo = placeOrderVo.getAddressNo();
+		/*此处应该根据客户ID和地址编号查询地址详情*/
+		/*生成订单ID*/
+		String orderId = UUID.randomUUID().toString().replaceAll("-", "");
+		/*下单详情*/
+		List<PlaceOrderDetailVo> details = placeOrderVo.getDetails();
+		List<OrderDetail> detailList = new ArrayList<>();
+		/*金额合计*/
+		double totalPrice=0;
+		/*折扣合计*/
+		double totalRatePrice=0;
+		/*数量合计*/
+		int totalCount = 0;
+		
+		for(PlaceOrderDetailVo detailVo :details) {
+			double tempTotalPrice = 0;
+			double tempTotalRatePrice = 0;
+			/*查询商品--数量、价格*/
+			ResultVO productVo = productFeignClient.findById(detailVo.getProUuid());
+			Product product = new Product();
+			if(productVo== null || productVo.getData()== null) {
+				return ResultVOUtil.error(ResultEnum.PRODUCT_NOT_EXIST);
+			}else {
+				System.err.println(productVo.getData());
+				product = (Product) productVo.getData();
+			}
+			OrderDetail orderDetail = new OrderDetail();
+			orderDetail.setOrderDetailUuid(UUID.randomUUID().toString().replaceAll("-", ""));
+			orderDetail.setNumber(detailVo.getNumber());
+			orderDetail.setProUuid(product.getProUuid());
+			orderDetail.setOrderUuid(orderId);
+			/*商品规格和备注字段暂先省略*/
+			detailList.add(orderDetail);
+			/*计算总价*/
+			tempTotalPrice = product.getMaxPrice()*detailVo.getNumber();
+			orderDetail.setProductPrice(tempTotalPrice);
+			//tempTotalRatePrice = tempTotalPrice*orderDetail.getDiscountRate();
+			orderDetail.setDiscountAmount(tempTotalRatePrice);
+			tempTotalPrice -= tempTotalRatePrice;
+			/*得到对应总价*/
+			totalCount +=detailVo.getNumber();
+			totalRatePrice+=tempTotalRatePrice;
+			totalPrice+=tempTotalPrice;
+			
+			detailList.add(orderDetail);
+		}
 		/*写入订单数据库--订单总表和订单详情表*/
-		/*扣库存*/
+		Order order = new Order();
+		order.setCreateTime(new Date());
+		order.setOpenId(openId);
+		order.setOrderAmountTotal(totalPrice);
+		order.setOrderUuid(orderId);
+		order.setShopUuid(storeId);
+		order.setOrderStatus(0);
+		order.setProductAmountTotal(totalCount);
+		order.setDeAdUuid(addressNo);
+		/*写入订单总表*/
 		if (orderService.save(order) == null) {
 			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
 		} else {
-			return ResultVOUtil.success();
+			/*写入订单详情表*/
+			for(OrderDetail od :detailList) {
+				OrderDetail od1 = orderDetailService.save(od);
+				if(od1== null) {
+					return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
+				}
+			}
 		}
+		/*扣库存*/
+		for(PlaceOrderDetailVo detailVo :details) {
+			Product product = new Product();
+			product.setProUuid(detailVo.getProUuid());
+			product.setStock(detailVo.getNumber());
+			Product product1 = productFeignClient.update(product);
+			if(product1==null) {
+				return ResultVOUtil.error(ResultEnum.PRODUCT_STOCK_ERROR);
+			}
+		}
+		return ResultVOUtil.success();
 	}
 	@ApiOperation(value="根据订单ID删除订单信息")
 	@DeleteMapping("{id}")

@@ -23,6 +23,11 @@
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>com.taobao.txc</groupId>
+            <artifactId>txc-client</artifactId>
+            <version>2.0.72</version>
+        </dependency>
+		<dependency>
 			<groupId>com.beini</groupId>
 			<artifactId>beini-core</artifactId>
 			<version>0.1</version>
@@ -87,6 +92,11 @@
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 		</dependency>
+		<!-- <dependency>
+		    <groupId>org.quartz-scheduler</groupId>
+		    <artifactId>quartz</artifactId>
+		    <version>2.2.1</version>
+		</dependency> -->
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
