@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.beini.core.enums.ResultEnum;
+import com.beini.core.exception.GlobalException;
 import com.beini.core.utils.ResultVOUtil;
 import com.beini.core.vo.ResultVO;
 import com.beini.order.entity.Order;
@@ -30,8 +33,6 @@ import com.beini.order.service.OrderService;
 import com.beini.order.vo.PlaceOrderDetailVo;
 import com.beini.order.vo.PlaceOrderVo;
 import com.beini.product.entity.Product;
-import com.google.gson.Gson;
-import com.taobao.txc.client.aop.annotation.TxcTransaction;
 
 import io.swagger.annotations.ApiOperation;
 
@@ -52,16 +53,19 @@ public class OrderController {
 	 */
 	@ApiOperation(value="根据订单ID获取订单信息")
 	@GetMapping("{id}")
-	public ResultVO findById(@PathVariable(value = "id") String id) {
+	public ResultVO findById(@PathVariable(value = "id") String id,
+			@RequestParam(required=false,defaultValue="0",name="pageNo")int pageNo,
+			@RequestParam(required=false,defaultValue="10",name="pageSize")int pageSize) {
 		Order order = orderService.findById(id);
-		System.out.println("我是订单模块的findById： findById("+id+");");
-		ResultVO product = productFeignClient.findById(id);
-		//System.out.println(product+"---------------订单模块的商品信息");
-		System.out.println("我是商品模块的findById： findById(11);  "+product);
 		Map<String ,Object> model = new HashMap<String,Object>();
 		model.put("order", order);
-		model.put("product", product);
+		//ResultVO productVo = productFeignClient.findById(id);
+		//System.out.println(product+"---------------订单模块的商品信息");
+		//System.out.println("我是商品模块的findById： findById(11);  "+productVo);
+		//model.put("product", productVo.getData());
 		
+		Page<OrderDetail> orderDetails = orderDetailService.findAll(id,new PageRequest(pageNo,pageSize));
+		model.put("orderDetails", orderDetails);
 		return ResultVOUtil.success(model);
 	}
 	/**
@@ -91,26 +95,26 @@ public class OrderController {
 		}
 	}
 	@ApiOperation(value="增加订单信息")
-	/*TXC事务*/
-	@TxcTransaction
+	/*事务  引用javax.transaction.Transactional 的事务注解*/
+	@Transactional
 	@PostMapping
 	public ResultVO save(PlaceOrderVo placeOrderVo) throws Exception {
+		/*用户编号*/
 		String openId = placeOrderVo.getOpenId();
-		/*此处应该根据客户ID查询客户详情*/
-		
+		/**此处应该根据客户ID查询客户详情*/
+		/*运费金额*/
+		double logisticsFee = placeOrderVo.getLogisticsFee();
 		/*店铺ID*/
 		String storeId = placeOrderVo.getStoreId();
 		String addressNo = placeOrderVo.getAddressNo();
-		/*此处应该根据客户ID和地址编号查询地址详情*/
-		/*生成订单ID*/
-		String orderId = UUID.randomUUID().toString().replaceAll("-", "");
+		/**此处应该根据客户ID和地址编号查询地址详情*/
 		/*下单详情*/
 		List<PlaceOrderDetailVo> details = placeOrderVo.getDetails();
+		/*生成订单ID*/
+		String orderId = UUID.randomUUID().toString().replaceAll("-", "");
 		List<OrderDetail> detailList = new ArrayList<>();
 		/*金额合计*/
 		double totalPrice=0;
-		/*折扣合计*/
-		double totalRatePrice=0;
 		/*数量合计*/
 		int totalCount = 0;
 		
@@ -123,63 +127,71 @@ public class OrderController {
 			if(productVo== null || productVo.getData()== null) {
 				return ResultVOUtil.error(ResultEnum.PRODUCT_NOT_EXIST);
 			}else {
-				System.err.println(productVo.getData());
 				product = (Product) productVo.getData();
 			}
+			tempTotalPrice = product.getMaxPrice()*detailVo.getNumber();
+			tempTotalPrice -= tempTotalRatePrice;
+			/*得到对应总价*/
+			totalCount +=detailVo.getNumber();
+			totalPrice+=tempTotalPrice;
 			OrderDetail orderDetail = new OrderDetail();
 			orderDetail.setOrderDetailUuid(UUID.randomUUID().toString().replaceAll("-", ""));
 			orderDetail.setNumber(detailVo.getNumber());
 			orderDetail.setProUuid(product.getProUuid());
 			orderDetail.setOrderUuid(orderId);
-			/*商品规格和备注字段暂先省略*/
+			/**商品规格和备注字段暂先省略*/
 			detailList.add(orderDetail);
 			/*计算总价*/
-			tempTotalPrice = product.getMaxPrice()*detailVo.getNumber();
 			orderDetail.setProductPrice(tempTotalPrice);
-			//tempTotalRatePrice = tempTotalPrice*orderDetail.getDiscountRate();
+			//tempTotalRatePrice = tempTotalPrice*1;
 			orderDetail.setDiscountAmount(tempTotalRatePrice);
-			tempTotalPrice -= tempTotalRatePrice;
-			/*得到对应总价*/
-			totalCount +=detailVo.getNumber();
-			totalRatePrice+=tempTotalRatePrice;
-			totalPrice+=tempTotalPrice;
-			
+			/*暂时保存订单详情数据到列表*/
 			detailList.add(orderDetail);
 		}
+		totalPrice -= logisticsFee;
 		/*写入订单数据库--订单总表和订单详情表*/
 		Order order = new Order();
 		order.setCreateTime(new Date());
 		order.setOpenId(openId);
+		order.setLogisticsFee(logisticsFee);
 		order.setOrderAmountTotal(totalPrice);
 		order.setOrderUuid(orderId);
 		order.setShopUuid(storeId);
+		/**默认将支付状态设置为未支付-0*/
 		order.setOrderStatus(0);
 		order.setProductAmountTotal(totalCount);
 		order.setDeAdUuid(addressNo);
-		/*写入订单总表*/
+		/**--------------------------开始更新操作---------------------------------------**/
+		/*订单总表写入数据库*/
 		if (orderService.save(order) == null) {
-			return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
+			throw new GlobalException(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
 		} else {
-			/*写入订单详情表*/
+			/*订单详情表写入数据库*/
 			for(OrderDetail od :detailList) {
 				OrderDetail od1 = orderDetailService.save(od);
 				if(od1== null) {
-					return ResultVOUtil.error(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
+					throw new GlobalException(ResultEnum.ORDER_DETAIL_INSERT_FAIL);
 				}
 			}
 		}
 		/*扣库存*/
+		return deductingInventory(details);
+	}
+	/**
+	 * 扣减库存
+	 * @param details 下单明细信息
+	 * @return
+	 */
+	private ResultVO deductingInventory (List<PlaceOrderDetailVo> details) {
 		for(PlaceOrderDetailVo detailVo :details) {
-			Product product = new Product();
-			product.setProUuid(detailVo.getProUuid());
-			product.setStock(detailVo.getNumber());
-			Product product1 = productFeignClient.update(product);
-			if(product1==null) {
-				return ResultVOUtil.error(ResultEnum.PRODUCT_STOCK_ERROR);
+			ResultVO rv = productFeignClient.updateStock(detailVo.getProUuid(),detailVo.getNumber());
+			if(rv.getCode()!= ResultEnum.SUCCESS.getCode()) {
+				throw new GlobalException(ResultEnum.PRODUCT_STOCK_ERROR);
 			}
 		}
 		return ResultVOUtil.success();
 	}
+	
 	@ApiOperation(value="根据订单ID删除订单信息")
 	@DeleteMapping("{id}")
 	public ResultVO deleteById(@PathVariable(value="id") String id) {

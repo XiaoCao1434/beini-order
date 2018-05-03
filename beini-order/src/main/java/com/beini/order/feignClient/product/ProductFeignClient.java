@@ -45,5 +45,5 @@ public interface ProductFeignClient {
 	 * @return
 	 */
 	@PutMapping("/product/product/updateStock")
-	public Product update(Product product);
+	public ResultVO<Product> updateStock(@RequestParam("proUuid")String proUuid, @RequestParam("number")double number);
 }
