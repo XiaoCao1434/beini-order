@@ -32,6 +32,11 @@
 			<artifactId>beini-core</artifactId>
 			<version>0.1</version>
 		</dependency>
+		<!-- 运行工程报错缺少 hystrix相关的类 -->
+		<dependency>
+            <groupId>com.netflix.hystrix</groupId>
+            <artifactId>hystrix-javanica</artifactId>
+        </dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-eureka</artifactId>
@@ -67,7 +72,7 @@
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
-
+		
 		<!--swagger2依赖 -->
 		<dependency>
 			<groupId>io.springfox</groupId>
