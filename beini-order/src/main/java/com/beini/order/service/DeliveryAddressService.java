@@ -14,4 +14,12 @@ public interface DeliveryAddressService {
 	DeliveryAddress save(DeliveryAddress bean);
 	DeliveryAddress update(DeliveryAddress bean);
 	void delete(String... id);
+	
+	/**
+	 * 根据openId和分页信息获取送货地址分页信息内容
+	 * @param openId openId
+	 * @param request 分页信息
+	 * @return 送货地址分页信息内容
+	 */
+	Page<DeliveryAddress> findAllByOpenId(String openId, Pageable request);
 }

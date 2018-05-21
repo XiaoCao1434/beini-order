@@ -42,4 +42,9 @@ public class DeliveryAddressServiceImpl implements DeliveryAddressService {
 			e.printStackTrace();
 		}
 	}
+
+	@Override
+	public Page<DeliveryAddress> findAllByOpenId(String openId, Pageable request) {
+		return repository.findAllByOpenId(openId,request);
+	}
 }
